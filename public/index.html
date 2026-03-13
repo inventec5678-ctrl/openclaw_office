@@ -101,11 +101,17 @@
 
     .main-content {
       display: grid;
-      grid-template-columns: 1fr 400px;
+      grid-template-columns: 1fr 1fr 400px;
       gap: 24px;
     }
 
-    @media (max-width: 1024px) {
+    @media (max-width: 1400px) {
+      .main-content {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 900px) {
       .main-content {
         grid-template-columns: 1fr;
       }
@@ -164,12 +170,36 @@
       border: 1px solid var(--border-color);
       border-radius: 10px;
       padding: 16px;
-      transition: transform 0.2s, border-color 0.2s;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      cursor: default;
     }
 
-    .agent-card:hover {
+    .agent-card.has-memory {
+      cursor: pointer;
+    }
+
+    .agent-card.has-memory:hover {
       transform: translateY(-2px);
       border-color: var(--accent-blue);
+      box-shadow: 0 4px 12px rgba(88, 166, 255, 0.15);
+    }
+
+    .memory-badge {
+      font-size: 16px;
+      opacity: 0.8;
+    }
+
+    .agent-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .agent-card.has-memory:hover .agent-hint {
+      opacity: 1;
     }
 
     .agent-header {
@@ -264,19 +294,68 @@
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .job-item:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .job-item.running {
+      border-left: 3px solid var(--accent-blue);
+    }
+
+    .job-item.pending {
+      border-left: 3px solid var(--accent-yellow);
+    }
+
+    .job-item.completed {
+      border-left: 3px solid var(--accent-green);
+    }
+
+    .job-item.failed {
+      border-left: 3px solid var(--accent-red);
     }
 
     .job-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
+    }
+
+    .job-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .job-icon {
+      font-size: 16px;
     }
 
     .job-id {
       font-size: 14px;
       font-weight: 600;
       color: var(--accent-blue);
+    }
+
+    .job-current-action {
+      background: var(--bg-secondary);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .job-current-action .action-label {
+      color: var(--text-muted);
+      margin-right: 8px;
+    }
+
+    .job-current-action .action-value {
+      color: var(--text-primary);
+      font-weight: 500;
     }
 
     .job-status {
@@ -317,12 +396,152 @@
       gap: 16px;
       font-size: 12px;
       color: var(--text-muted);
+      flex-wrap: wrap;
     }
 
     .job-meta span {
       display: flex;
       align-items: center;
       gap: 4px;
+    }
+
+    .job-error {
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(248, 81, 73, 0.15);
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--accent-red);
+    }
+
+    .job-schedule {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Sessions Grid */
+    .sessions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .session-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .session-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-purple);
+    }
+
+    .session-card.live {
+      border-left: 3px solid var(--accent-green);
+    }
+
+    .session-card.recent {
+      border-left: 3px solid var(--accent-yellow);
+    }
+
+    .session-card.idle {
+      border-left: 3px solid var(--text-muted);
+    }
+
+    .session-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .session-key {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 180px;
+    }
+
+    .session-kind {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+
+    .session-kind.direct {
+      background: rgba(163, 113, 247, 0.2);
+      color: var(--accent-purple);
+    }
+
+    .session-kind.group {
+      background: rgba(88, 166, 255, 0.2);
+      color: var(--accent-blue);
+    }
+
+    .session-kind.channel {
+      background: rgba(63, 185, 80, 0.2);
+      color: var(--accent-green);
+    }
+
+    .session-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .session-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .session-stat-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .session-stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .session-model {
+      font-size: 11px;
+      color: var(--text-muted);
+      padding-top: 8px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .session-model span {
+      color: var(--accent-purple);
+    }
+
+    .session-progress {
+      height: 4px;
+      background: var(--bg-secondary);
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .session-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+      border-radius: 2px;
+      transition: width 0.3s ease;
     }
 
     .empty-state {
@@ -374,6 +593,830 @@
     ::-webkit-scrollbar-thumb:hover {
       background: var(--text-muted);
     }
+
+    /* Cost Analysis */
+    .cost-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .cost-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .cost-card.highlight {
+      grid-column: span 2;
+      background: linear-gradient(135deg, rgba(163, 113, 247, 0.1), rgba(88, 166, 255, 0.1));
+      border-color: var(--accent-purple);
+    }
+
+    .cost-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .cost-card.highlight .cost-value {
+      color: var(--accent-purple);
+    }
+
+    .cost-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .cost-breakdown {
+      margin-top: 12px;
+    }
+
+    .cost-model-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 13px;
+    }
+
+    .cost-model-item:last-child {
+      border-bottom: none;
+    }
+
+    .cost-model-name {
+      color: var(--text-secondary);
+    }
+
+    .cost-model-tokens {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    /* Memory Browser */
+    .memory-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    .memory-item {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .memory-item:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .memory-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .memory-icon {
+      font-size: 16px;
+    }
+
+    .memory-preview {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .memory-meta {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Memory Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      max-width: 800px;
+      max-height: 80vh;
+      width: 90%;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .modal-close:hover {
+      color: var(--text-primary);
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      max-height: calc(80vh - 60px);
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      color: var(--text-secondary);
+    }
+
+    /* Topics Grid */
+    .topics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .topic-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .topic-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-purple);
+    }
+
+    .topic-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .topic-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .topic-icon.telegram {
+      background: rgba(88, 166, 255, 0.2);
+    }
+
+    .topic-icon.discord {
+      background: rgba(163, 113, 247, 0.2);
+    }
+
+    .topic-icon.line {
+      background: rgba(63, 185, 80, 0.2);
+    }
+
+    .topic-channel {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .topic-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .topic-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .topic-stat-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .topic-stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* Tab Navigation */
+    .tab-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .tab-btn {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px 16px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      border-color: var(--accent-blue);
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: white;
+    }
+
+    /* Agent Memory Editor */
+    .agent-memory-editor {
+      width: 100%;
+      min-height: 300px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      color: var(--text-primary);
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      resize: vertical;
+    }
+
+    .agent-memory-editor:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4090e8;
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    /* Second Row Layout */
+    .second-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    @media (max-width: 1200px) {
+      .second-row {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .second-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ============ Hero View Styles ============ */
+    .hero-view {
+      background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px;
+    }
+
+    .hero-stat {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .hero-stat:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-blue);
+    }
+
+    .hero-stat.capacity {
+      border-color: var(--accent-green);
+    }
+
+    .hero-stat-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .hero-stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .hero-stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* ============ System Vitals Styles ============ */
+    .vitals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .vital-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .vital-card.cpu { border-left: 3px solid var(--accent-blue); }
+    .vital-card.memory { border-left: 3px solid var(--accent-purple); }
+    .vital-card.disk { border-left: 3px solid var(--accent-green); }
+    .vital-card.system { border-left: 3px solid var(--accent-yellow); }
+
+    .vital-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .vital-icon {
+      font-size: 18px;
+    }
+
+    .vital-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .vital-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent-blue);
+      margin-bottom: 8px;
+    }
+
+    .vital-details {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    /* ============ Operators Styles ============ */
+    .operators-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    .operator-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .operator-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-purple);
+    }
+
+    .operator-card.active {
+      border-left: 3px solid var(--accent-green);
+    }
+
+    .operator-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .operator-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .operator-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .operator-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .operator-channel {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .operator-stats {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+
+    .operator-stat {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .operator-stat-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .operator-stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .operator-last-activity {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .activity-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .activity-dot.live {
+      background: var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    /* ============ Savings Styles ============ */
+    .savings-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 12px;
+    }
+
+    .savings-card {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .savings-card.highlight {
+      background: linear-gradient(135deg, rgba(63, 185, 80, 0.15), rgba(88, 166, 255, 0.15));
+      border-color: var(--accent-green);
+    }
+
+    .savings-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .savings-card.highlight .savings-value {
+      color: var(--accent-green);
+    }
+
+    .savings-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* ============ Privacy Controls ============ */
+    .privacy-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .privacy-toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
+
+    .privacy-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      transition: 0.3s;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 2px;
+      bottom: 2px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+
+    .privacy-toggle input:checked + .toggle-slider {
+      background: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+
+    .privacy-toggle input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+      background: white;
+    }
+
+    .privacy-label {
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    .privacy-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    /* ============ Session Detail Modal ============ */
+    .session-detail-content {
+      padding: 0;
+    }
+
+    .session-detail-section {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .session-detail-section:last-child {
+      border-bottom: none;
+    }
+
+    .detail-header {
+      margin-bottom: 12px;
+    }
+
+    .detail-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .detail-value {
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .detail-value.code {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      background: var(--bg-primary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+
+    .detail-value.highlight {
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .tools-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tool-tag {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--accent-purple);
+    }
+
+    .text-muted {
+      color: var(--text-muted);
+    }
+
+    /* ============ Operator Detail Modal ============ */
+    .operator-detail-section {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .operator-detail-section:last-child {
+      border-bottom: none;
+    }
+
+    .recent-sessions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .recent-session-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--bg-primary);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .session-id {
+      color: var(--accent-blue);
+      font-family: monospace;
+    }
+
+    .session-tokens {
+      color: var(--text-secondary);
+    }
+
+    .session-time {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    /* ============ Third Row ============ */
+    .third-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    @media (max-width: 1000px) {
+      .third-row {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -389,6 +1432,43 @@
       </div>
     </header>
 
+    <!-- 隱私控制 -->
+    <div class="privacy-controls">
+      <label class="privacy-toggle">
+        <input type="checkbox" id="privacyToggle" onchange="togglePrivacyControls(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="privacy-label">🔒 隱私控制</span>
+      <span class="privacy-hint">隱藏敏感內容以利展示</span>
+    </div>
+
+    <!-- Hero View 總覽儀表板 -->
+    <div class="hero-view">
+      <div class="section-header" style="margin-bottom: 16px;">
+        <h2 class="section-title">🏠 總覽儀表板</h2>
+      </div>
+      <div class="hero-stats" id="heroStats">
+        <div class="hero-stat">
+          <div class="hero-stat-icon">🎯</div>
+          <div class="hero-stat-value">-</div>
+          <div class="hero-stat-label">總 Tokens</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Vitals 系統監控 -->
+    <div class="section">
+      <div class="section-header">
+        <h2 class="section-title">💻 系統監控</h2>
+      </div>
+      <div class="vitals-grid" id="vitalsGrid">
+        <div class="loading">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第一行：現有功能 -->
     <div class="main-content">
       <!-- Agents Section -->
       <div class="section">
@@ -397,6 +1477,19 @@
           <span class="badge badge-active" id="agentCount">0 online</span>
         </div>
         <div class="agents-grid" id="agentsGrid">
+          <div class="loading">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sessions Section -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">💬 Sessions 監控</h2>
+          <span class="badge badge-active" id="sessionCount">0 active</span>
+        </div>
+        <div class="sessions-grid" id="sessionsGrid">
           <div class="loading">
             <div class="spinner"></div>
           </div>
@@ -413,6 +1506,169 @@
           <div class="loading">
             <div class="spinner"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第二行：新功能 -->
+    <div class="second-row">
+      <!-- Cost Analysis Section -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">💰 成本分析</h2>
+          <span class="badge badge-active" id="costBadge">$0.00</span>
+        </div>
+        <div class="cost-cards" id="costCards">
+          <div class="loading">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Memory Browser Section -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">🧠 Memory Browser</h2>
+          <span class="badge badge-active" id="memoryCount">0 檔案</span>
+        </div>
+        <div class="memory-list" id="memoryList">
+          <div class="loading">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cerebro Topics Section -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">📊 Cerebro Topics</h2>
+          <span class="badge badge-active" id="topicCount">0 主題</span>
+        </div>
+        <div class="topics-grid" id="topicsGrid">
+          <div class="loading">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第三行： Operators & Savings -->
+    <div class="third-row">
+      <!-- Operators Section -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">👥 Operators 運營者</h2>
+          <span class="badge badge-active" id="operatorCount">0 人</span>
+        </div>
+        <div class="operators-grid" id="operatorsGrid">
+          <div class="loading">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Savings Projections Section -->
+      <div class="section">
+        <div class="section-header">
+          <h2 class="section-title">📈 節省預估</h2>
+          <span class="badge badge-active" id="savingsBadge">$0</span>
+        </div>
+        <div class="savings-cards" id="savingsCards">
+          <div class="loading">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Memory Modal -->
+  <div class="modal-overlay" id="memoryModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">記憶檔案</span>
+        <button class="modal-close" onclick="closeMemoryModal()">×</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Agent Memory Modal -->
+  <div class="modal-overlay" id="agentMemoryModal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <span class="modal-title" id="agentModalTitle">Agent 記憶檔案</span>
+        <button class="modal-close" onclick="closeAgentMemoryModal()">×</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div class="agent-modal-filename" id="agentModalFilename" style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;"></div>
+        <textarea id="agentModalBody" class="agent-memory-editor" placeholder="載入中..."></textarea>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeAgentMemoryModal()">取消</button>
+          <button class="btn btn-primary" onclick="saveAgentMemory()">💾 儲存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Detail Modal -->
+  <div class="modal-overlay" id="sessionDetailModal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <span class="modal-title">📋 Session 詳情</span>
+        <button class="modal-close" onclick="closeSessionDetailModal()">×</button>
+      </div>
+      <div class="modal-body session-detail-content" id="sessionDetailContent">
+        <div class="loading">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Operator Detail Modal -->
+  <div class="modal-overlay" id="operatorDetailModal">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <span class="modal-title">👤 Operator 詳情</span>
+        <button class="modal-close" onclick="closeOperatorDetailModal()">×</button>
+      </div>
+      <div class="modal-body session-detail-content" id="operatorDetailContent">
+        <div class="loading">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 點擊 modal 背景關閉
+    document.getElementById('memoryModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'memoryModal') {
+        closeMemoryModal();
+      }
+    });
+
+    document.getElementById('agentMemoryModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'agentMemoryModal') {
+        closeAgentMemoryModal();
+      }
+    });
+  </script>
+
+  <!-- Agent Memory Modal -->
+  <div class="modal-overlay" id="agentMemoryModal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <span class="modal-title" id="agentModalTitle">Agent 記憶檔案</span>
+        <button class="modal-close" onclick="closeAgentMemoryModal()">×</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div class="agent-modal-filename" id="agentModalFilename" style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;"></div>
+        <textarea id="agentModalBody" class="agent-memory-editor" placeholder="載入中..."></textarea>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeAgentMemoryModal()">取消</button>
+          <button class="btn btn-primary" onclick="saveAgentMemory()">💾 儲存</button>
         </div>
       </div>
     </div>
