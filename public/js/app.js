@@ -14,15 +14,139 @@ class OpenClawOffice {
     this.privacy = { enabled: false, hiddenTopics: [], hiddenSessions: [], hiddenAgents: [], hideCostData: false };
     this.hero = { totalTokens: 0, totalCost: 0, totalSessions: 0, activeSessions: 0, systemCapacity: 0, recentCost: 0, monthlySavings: 0 };
     this.sseConnected = false;
-    this.currentView = 'dashboard'; // dashboard, hero
+    this.currentView = 'dashboard';
+    
+    // Job status tracking for notifications
+    this.previousJobs = [];
+    this.notificationPermission = 'default';
+    
+    // Chart instance
+    this.costChart = null;
     
     this.init();
   }
 
   async init() {
+    // Request notification permission
+    this.requestNotificationPermission();
+    
     await this.connectSSE();
     await this.fetchData();
     this.startPolling();
+  }
+
+  // 請求通知權限
+  async requestNotificationPermission() {
+    if ('Notification' in window) {
+      if (Notification.permission === 'default') {
+        try {
+          const permission = await Notification.requestPermission();
+          this.notificationPermission = permission;
+          console.log('通知權限:', permission);
+        } catch (e) {
+          console.log('無法請求通知權限');
+        }
+      } else {
+        this.notificationPermission = Notification.permission;
+      }
+    }
+  }
+
+  // 顯示瀏覽器通知
+  showBrowserNotification(title, options) {
+    if (this.notificationPermission === 'granted') {
+      try {
+        const notification = new Notification(title, {
+          icon: '🦔',
+          badge: '🦔',
+          ...options
+        });
+        
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+        
+        // 5秒後自動關閉
+        setTimeout(() => notification.close(), 5000);
+      } catch (e) {
+        console.log('瀏覽器通知失敗:', e);
+      }
+    }
+  }
+
+  // 顯示 Toast 通知
+  showToast(title, message, type = 'info') {
+    const toast = document.getElementById('notificationToast');
+    const iconEl = document.getElementById('notificationIcon');
+    const titleEl = document.getElementById('notificationTitle');
+    const messageEl = document.getElementById('notificationMessage');
+    
+    const icons = {
+      'success': '✅',
+      'error': '❌',
+      'info': 'ℹ️',
+      'warning': '⚠️'
+    };
+    
+    // 移除舊的 class
+    toast.classList.remove('success', 'error', 'info');
+    toast.classList.add(type);
+    
+    iconEl.textContent = icons[type] || 'ℹ️';
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    
+    // 顯示 toast
+    toast.classList.add('show');
+    
+    // 5秒後自動關閉
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 5000);
+  }
+
+  // 檢查 Job 狀態變化並發送通知
+  checkJobStatusChanges() {
+    if (this.previousJobs.length === 0) {
+      this.previousJobs = [...this.jobs];
+      return;
+    }
+    
+    const jobMap = new Map(this.previousJobs.map(j => [j.name || j.id, j]));
+    
+    this.jobs.forEach(job => {
+      const jobId = job.name || job.id;
+      const previousJob = jobMap.get(jobId);
+      
+      if (previousJob) {
+        const prevStatus = previousJob.status;
+        const newStatus = job.status;
+        
+        // 檢查狀態變化
+        if (prevStatus !== newStatus) {
+          if (newStatus === 'completed') {
+            this.showToast('工作完成', `${jobId} 已完成`, 'success');
+            this.showBrowserNotification('工作完成', {
+              body: `${jobId} 已成功完成`,
+              tag: jobId
+            });
+          } else if (newStatus === 'failed') {
+            const errorMsg = job.lastError || '未知錯誤';
+            this.showToast('工作失敗', `${jobId}: ${errorMsg}`, 'error');
+            this.showBrowserNotification('工作失敗', {
+              body: `${jobId} 執行失敗: ${errorMsg}`,
+              tag: jobId
+            });
+          } else if (newStatus === 'running' && prevStatus !== 'running') {
+            this.showToast('工作開始', `${jobId} 開始執行`, 'info');
+          }
+        }
+      }
+    });
+    
+    // 更新 previous jobs
+    this.previousJobs = [...this.jobs];
   }
 
   // 連接 SSE 即時更新
@@ -190,6 +314,15 @@ class OpenClawOffice {
     this.renderTopics();
     this.updateCounts();
     this.updatePrivacyToggle();
+    
+    // 檢查 Job 狀態變化
+    this.checkJobStatusChanges();
+    
+    // 更新趨勢圖（如果當前顯示圖表視圖）
+    const chartView = document.getElementById('costChartView');
+    if (chartView && chartView.style.display !== 'none') {
+      this.updateCostChart();
+    }
   }
 
   // ============ Hero View 渲染 ============
@@ -1218,3 +1351,252 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
   window.app = new OpenClawOffice();
 });
+
+// ============ Cost Chart Functions ============
+
+// 切換成本檢視
+function switchCostView(view) {
+  const cardsView = document.getElementById('costCardsView');
+  const chartView = document.getElementById('costChartView');
+  const tabs = document.querySelectorAll('.cost-tab-btn');
+  
+  tabs.forEach(tab => {
+    if (tab.dataset.view === view) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+  
+  if (view === 'cards') {
+    cardsView.style.display = 'block';
+    chartView.style.display = 'none';
+  } else {
+    cardsView.style.display = 'none';
+    chartView.style.display = 'block';
+    // 初始化圖表
+    setTimeout(() => window.app?.updateCostChart(), 100);
+  }
+}
+
+// 更新成本趨勢圖
+function updateCostChart() {
+  const app = window.app;
+  if (!app) return;
+  
+  const canvas = document.getElementById('costTrendChart');
+  if (!canvas) return;
+  
+  const timeRange = document.getElementById('costTimeRange')?.value || 'daily';
+  const ctx = canvas.getContext('2d');
+  
+  // 獲取成本數據
+  const dailyData = app.costData?.dailyBreakdown || [];
+  const summary = app.costData?.summary || {};
+  
+  // 根據時間範圍處理數據
+  let labels = [];
+  let data = [];
+  let costData = [];
+  
+  if (dailyData.length > 0) {
+    // 每日數據
+    if (timeRange === 'daily') {
+      const last7Days = dailyData.slice(-7);
+      labels = last7Days.map(d => d.date || d.day || 'N/A');
+      data = last7Days.map(d => d.tokens || 0);
+      costData = last7Days.map(d => d.cost || 0);
+    } else if (timeRange === 'weekly') {
+      // 每週數據 - 聚合每週
+      const weeks = {};
+      dailyData.forEach(d => {
+        const date = new Date(d.date || d.day);
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay());
+        const weekKey = weekStart.toISOString().split('T')[0];
+        if (!weeks[weekKey]) {
+          weeks[weekKey] = { tokens: 0, cost: 0 };
+        }
+        weeks[weekKey].tokens += d.tokens || 0;
+        weeks[weekKey].cost += d.cost || 0;
+      });
+      const weekArr = Object.entries(weeks).slice(-4);
+      labels = weekArr.map(([k]) => `W${k.slice(5)}`);
+      data = weekArr.map(([, v]) => v.tokens);
+      costData = weekArr.map(([, v]) => v.cost);
+    } else {
+      // 每月數據
+      const months = {};
+      dailyData.forEach(d => {
+        const monthKey = (d.date || d.day || '').slice(0, 7);
+        if (!months[monthKey]) {
+          months[monthKey] = { tokens: 0, cost: 0 };
+        }
+        months[monthKey].tokens += d.tokens || 0;
+        months[monthKey].cost += d.cost || 0;
+      });
+      const monthArr = Object.entries(months).slice(-6);
+      labels = monthArr.map(([k]) => k.slice(5) + '月');
+      data = monthArr.map(([, v]) => v.tokens);
+      costData = monthArr.map(([, v]) => v.cost);
+    }
+  } else {
+    // 如果沒有 dailyBreakdown，使用模擬數據
+    labels = ['今天', '昨天', '2天前', '3天前', '4天前', '5天前', '6天前'].reverse();
+    data = [summary.recentTokens || 1000, 1200, 900, 1500, 1100, 800, 1300];
+    costData = [0.05, 0.06, 0.04, 0.07, 0.05, 0.04, 0.06];
+  }
+  
+  // 摧毀舊圖表
+  if (app.costChart) {
+    app.costChart.destroy();
+  }
+  
+  // 建立新圖表
+  app.costChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '花費 (USD)',
+          data: costData,
+          borderColor: '#a371f7',
+          backgroundColor: 'rgba(163, 113, 247, 0.1)',
+          fill: true,
+          tension: 0.4,
+          yAxisID: 'y',
+          pointBackgroundColor: '#a371f7',
+          pointBorderColor: '#fff',
+          pointRadius: 4,
+          pointHoverRadius: 6
+        },
+        {
+          label: 'Tokens',
+          data: data,
+          borderColor: '#58a6ff',
+          backgroundColor: 'rgba(88, 166, 255, 0.1)',
+          fill: true,
+          tension: 0.4,
+          yAxisID: 'y1',
+          pointBackgroundColor: '#58a6ff',
+          pointBorderColor: '#fff',
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: '#8b949e',
+            usePointStyle: true,
+            padding: 16,
+            font: {
+              size: 12
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: '#161b22',
+          titleColor: '#e6edf3',
+          bodyColor: '#8b949e',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          padding: 12,
+          displayColors: true,
+          callbacks: {
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              if (context.parsed.y !== null) {
+                if (context.datasetIndex === 0) {
+                  label += '$' + context.parsed.y.toFixed(4);
+                } else {
+                  label += app.formatNumber(context.parsed.y) + ' tokens';
+                }
+              }
+              return label;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: '#21262d',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#8b949e',
+            font: {
+              size: 11
+            }
+          }
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          grid: {
+            color: '#21262d',
+            drawBorder: false
+          },
+          ticks: {
+            color: '#a371f7',
+            font: {
+              size: 11
+            },
+            callback: function(value) {
+              return '$' + value.toFixed(2);
+            }
+          },
+          title: {
+            display: true,
+            text: '花費 (USD)',
+            color: '#a371f7'
+          }
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          grid: {
+            drawOnChartArea: false
+          },
+          ticks: {
+            color: '#58a6ff',
+            font: {
+              size: 11
+            },
+            callback: function(value) {
+              return app.formatNumber(value);
+            }
+          },
+          title: {
+            display: true,
+            text: 'Tokens',
+            color: '#58a6ff'
+          }
+        }
+      }
+    }
+  });
+}
+
+// ============ Notification Functions ============
+
+function closeNotification() {
+  const toast = document.getElementById('notificationToast');
+  toast.classList.remove('show');
+}
