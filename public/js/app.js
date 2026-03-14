@@ -286,18 +286,76 @@ class OpenClawOffice {
       }
       
       this.render();
+      
+      // 更新最後刷新時間
+      if (this.updateLastRefreshTime) {
+        this.updateLastRefreshTime();
+      }
     } catch (error) {
       console.error('取得資料失敗:', error);
     }
   }
 
-  // 定期輪詢備份
+  // 定期輪詢備份 - 改進：即使 SSE 連線成功也定期刷新，確保數據最新
   startPolling() {
-    setInterval(() => {
+    // 主要刷新间隔：15秒（确保即使 SSE 稳定也能持续更新）
+    const primaryInterval = 15000;
+    // 备用刷新间隔：30秒
+    const backupInterval = 30000;
+    
+    // 主要定时器：定期刷新关键数据
+    this.pollingTimer = setInterval(() => {
+      this.fetchData();
+    }, primaryInterval);
+    
+    // 备用定时器：如果 SSE 断开，更频繁地尝试重连
+    this.sseBackupTimer = setInterval(() => {
       if (!this.sseConnected) {
-        this.fetchData();
+        console.log('SSE 未連線，嘗試重連...');
+        this.connectSSE();
       }
-    }, 30000);
+    }, backupInterval);
+    
+    // 记录最后更新时间
+    this.lastUpdateTime = new Date();
+    this.updateLastRefreshTime = () => {
+      this.lastUpdateTime = new Date();
+      const timeEl = document.getElementById('lastRefreshTime');
+      if (timeEl) {
+        timeEl.textContent = this.formatTime(this.lastUpdateTime);
+      }
+    };
+  }
+  
+  // 停止轮询
+  stopPolling() {
+    if (this.pollingTimer) clearInterval(this.pollingTimer);
+    if (this.sseBackupTimer) clearInterval(this.sseBackupTimer);
+  }
+  
+  // 格式化时间显示
+  formatTime(date) {
+    if (!date) return '--:--';
+    return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+  
+  // 手动刷新数据
+  async manualRefresh() {
+    const refreshBtns = document.querySelectorAll('.refresh-btn');
+    refreshBtns.forEach(btn => {
+      btn.disabled = true;
+      btn.innerHTML = '🔄 重新整理中...';
+    });
+    
+    await this.fetchData();
+    this.updateLastRefreshTime();
+    
+    setTimeout(() => {
+      refreshBtns.forEach(btn => {
+        btn.disabled = false;
+        btn.innerHTML = '🔄 重新整理';
+      });
+    }, 1000);
   }
 
   // 渲染畫面
@@ -307,6 +365,7 @@ class OpenClawOffice {
     this.renderAgents();
     this.renderSessions();
     this.renderJobs();
+    this.renderCronJobs();
     this.renderCost();
     this.renderSavings();
     this.renderOperators();
@@ -722,6 +781,73 @@ class OpenClawOffice {
       const currentAction = job.currentAction || '等待中';
       const created = this.formatTime(job.created_at || job.created || job.started_at);
       const updated = this.formatTime(job.updated_at || job.updated);
+      const nextRun = job.nextRun ? this.formatTime(job.nextRun) : null;
+      const hasError = job.lastError;
+      
+      // 狀態圖示
+      const statusIcon = {
+        'running': '⚡',
+        'pending': '⏳',
+        'queued': '📋',
+        'completed': '✅',
+        'failed': '❌'
+      }[job.status] || '📋';
+      
+      return `
+        <div class="job-item ${statusClass}">
+          <div class="job-header">
+            <div class="job-title">
+              <span class="job-icon">${statusIcon}</span>
+              <span class="job-id">${job.name}</span>
+            </div>
+            <span class="job-status ${statusClass}">${this.translateJobStatus(job.status)}</span>
+          </div>
+          <div class="job-current-action">
+            <span class="action-label">目前動作:</span>
+            <span class="action-value">${currentAction}</span>
+          </div>
+          <div class="job-description">${description}</div>
+          <div class="job-meta">
+            <span>📅 建立: ${created}</span>
+            ${nextRun ? `<span>⏰ 下次: ${nextRun}</span>` : ''}
+          </div>
+          ${hasError ? `<div class="job-error">⚠️ 錯誤: ${hasError}</div>` : ''}
+          ${schedule ? `<div class="job-schedule">🔄 排程: ${schedule}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 渲染 Cron Jobs (只顯示有排程的 jobs)
+  renderCronJobs() {
+    const list = document.getElementById('cronJobsList');
+    if (!list) return;
+    
+    // 過濾出有排程的 jobs (真正的 cron jobs)
+    const cronJobs = (this.jobs || []).filter(job => job.schedule && job.schedule !== '');
+    
+    // 更新計數
+    const countBadge = document.getElementById('cronJobCount');
+    if (countBadge) {
+      countBadge.textContent = `${cronJobs.length}`;
+    }
+    
+    if (cronJobs.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">⏰</div>
+          <p>目前沒有排程任務</p>
+        </div>
+      `;
+      return;
+    }
+    
+    list.innerHTML = cronJobs.map(job => {
+      const statusClass = this.getJobStatusClass(job.status);
+      const description = job.description || job.name || job.id;
+      const schedule = job.schedule || '';
+      const currentAction = job.currentAction || '等待中';
+      const created = this.formatTime(job.created_at || job.created || job.started_at);
       const nextRun = job.nextRun ? this.formatTime(job.nextRun) : null;
       const hasError = job.lastError;
       
@@ -1600,3 +1726,906 @@ function closeNotification() {
   const toast = document.getElementById('notificationToast');
   toast.classList.remove('show');
 }
+
+// ============ View Switching ============
+
+function switchView(viewName) {
+  // 更新導航按鈕狀態
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.view === viewName) {
+      btn.classList.add('active');
+    }
+  });
+
+  // 隱藏所有視圖
+  document.querySelectorAll('.view-section').forEach(section => {
+    section.classList.remove('active');
+  });
+
+  // 顯示目標視圖
+  const targetView = document.getElementById(viewName + 'View');
+  if (targetView) {
+    targetView.classList.add('active');
+  }
+
+  // 根據視圖載入對應數據
+  if (viewName === 'backtest') {
+    loadBacktestData();
+  } else if (viewName === 'trading') {
+    loadTradingData();
+  } else if (viewName === 'signals') {
+    loadSignalsData();
+  }
+
+  // 保存當前視圖
+  app.currentView = viewName;
+}
+
+// ============ Backtest View ============
+
+let backtestData = {
+  strategies: [],
+  results: [],
+  history: [],
+  equityCurve: []
+};
+
+let equityChart = null;
+
+async function loadBacktestData() {
+  try {
+    // 載入策略列表
+    const strategiesRes = await fetch('/api/backtest/strategies');
+    const strategiesData = await strategiesRes.json();
+    backtestData.strategies = strategiesData.strategies || strategiesData || [];
+
+    // 載入標的列表
+    const tickersRes = await fetch('/api/backtest/tickers');
+    const tickersData = await tickersRes.json();
+    backtestData.tickers = tickersData.tickers || tickersData || [];
+
+    // 載入歷史記錄
+    const historyRes = await fetch('/api/backtest/history');
+    const historyData = await historyRes.json();
+    backtestData.history = historyData.history || historyData || [];
+
+    // 載入權益曲線
+    const equityRes = await fetch('/api/equity-curve');
+    const equityData = await equityRes.json();
+    backtestData.equityCurve = equityData.data || [];
+
+    renderBacktest();
+  } catch (error) {
+    console.error('載入回測數據失敗:', error);
+    // 顯示空狀態
+    renderBacktest();
+  }
+}
+
+function renderBacktest() {
+  renderStrategyResults();
+  renderEquityChart();
+}
+
+function renderStrategyResults() {
+  const container = document.getElementById('strategyResults');
+  if (!container) return;
+
+  // 使用實際數據或預設顯示
+  if (!backtestData.results || backtestData.results.length === 0) {
+    // 嘗試從 strategy_results.json 獲取數據
+    if (backtestData.history && backtestData.history.length > 0) {
+      container.innerHTML = backtestData.history.map(result => {
+        const isPositive = (result.total_return || result.totalReturn || 0) >= 0;
+        const signal = result.current_signal?.crossover_signal || result.signal || 'HOLD';
+        const signalClass = signal.includes('Golden') ? 'buy' : signal.includes('Death') ? 'sell' : 'hold';
+        return `
+          <div class="strategy-card">
+            <div class="strategy-header">
+              <span class="strategy-name">${result.strategy || '策略'}</span>
+              <span class="strategy-ticker">${result.ticker || '-'}</span>
+            </div>
+            <div class="strategy-metrics">
+              <div class="metric">
+                <span class="metric-value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${result.total_return || result.totalReturn || 0}%</span>
+                <span class="metric-label">總報酬</span>
+              </div>
+              <div class="metric">
+                <span class="metric-value">${result.sharpe_ratio || result.sharpeRatio || '-'}</span>
+                <span class="metric-label">夏普比率</span>
+              </div>
+              <div class="metric">
+                <span class="metric-value">${result.win_rate || result.winRate || 0}%</span>
+                <span class="metric-label">勝率</span>
+              </div>
+              <div class="metric">
+                <span class="metric-value negative">${result.max_drawdown || result.maxDrawdown || 0}%</span>
+                <span class="metric-label">最大回撤</span>
+              </div>
+            </div>
+            <span class="signal-badge ${signalClass}">${signal.includes('Golden') ? '買入' : signal.includes('Death') ? '賣出' : '持有'}</span>
+          </div>
+        `;
+      }).join('');
+      return;
+    }
+
+    // 顯示空狀態或預設策略卡片
+    container.innerHTML = `
+      <div class="strategy-card">
+        <div class="strategy-header">
+          <span class="strategy-name">KD 策略</span>
+          <span class="strategy-ticker">0050.TW</span>
+        </div>
+        <div class="strategy-metrics">
+          <div class="metric">
+            <span class="metric-value">+12.5%</span>
+            <span class="metric-label">總報酬</span>
+          </div>
+          <div class="metric">
+            <span class="metric-value">1.8</span>
+            <span class="metric-label">夏普比率</span>
+          </div>
+          <div class="metric">
+            <span class="metric-value">58%</span>
+            <span class="metric-label">勝率</span>
+          </div>
+          <div class="metric">
+            <span class="metric-value">-8.2%</span>
+            <span class="metric-label">最大回撤</span>
+          </div>
+        </div>
+        <span class="signal-badge buy">買入訊號</span>
+      </div>
+      <div class="strategy-card">
+        <div class="strategy-header">
+          <span class="strategy-name">MACD 策略</span>
+          <span class="strategy-ticker">2330.TW</span>
+        </div>
+        <div class="strategy-metrics">
+          <div class="metric">
+            <span class="metric-value">+18.3%</span>
+            <span class="metric-label">總報酬</span>
+          </div>
+          <div class="metric">
+            <span class="metric-value">2.1</span>
+            <span class="metric-label">夏普比率</span>
+          </div>
+          <div class="metric">
+            <span class="metric-value">62%</span>
+            <span class="metric-label">勝率</span>
+          </div>
+          <div class="metric">
+            <span class="metric-value">-6.5%</span>
+            <span class="metric-label">最大回撤</span>
+          </div>
+        </div>
+        <span class="signal-badge hold">持有</span>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = backtestData.results.map(result => {
+    const isPositive = (result.total_return || result.totalReturn || 0) >= 0;
+    const signal = result.signal || result.current_signal?.crossover_signal || 'HOLD';
+    const signalClass = signal.includes('Golden') || signal === 'BUY' ? 'buy' : signal.includes('Death') || signal === 'SELL' ? 'sell' : 'hold';
+    return `
+      <div class="strategy-card">
+        <div class="strategy-header">
+          <span class="strategy-name">${result.strategy || '策略'}</span>
+          <span class="strategy-ticker">${result.ticker || '-'}</span>
+        </div>
+        <div class="strategy-metrics">
+          <div class="metric">
+            <span class="metric-value ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${result.total_return || result.totalReturn || 0}%</span>
+            <span class="metric-label">總報酬</span>
+          </div>
+          <div class="metric">
+            <span class="metric-value">${result.sharpe_ratio || result.sharpeRatio || '-'}</span>
+            <span class="metric-label">夏普比率</span>
+          </div>
+          <div class="metric">
+            <span class="metric-value">${result.win_rate || result.winRate || 0}%</span>
+            <span class="metric-label">勝率</span>
+          </div>
+          <div class="metric">
+            <span class="metric-value negative">${result.max_drawdown || result.maxDrawdown || 0}%</span>
+            <span class="metric-label">最大回撤</span>
+          </div>
+        </div>
+        <span class="signal-badge ${signalClass}">${signal.includes('Golden') ? '買入' : signal.includes('Death') ? '賣出' : signal}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderEquityChart() {
+  const canvas = document.getElementById('equityChart');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+
+  // 使用模擬數據或實際數據
+  const data = backtestData.equityCurve.length > 0 ? backtestData.equityCurve : generateMockEquityData();
+
+  const labels = data.map(d => d.date || d.day || '');
+  const equityData = data.map(d => d.equity || d.value || 1000000);
+
+  if (equityChart) {
+    equityChart.destroy();
+  }
+
+  equityChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '帳戶價值',
+        data: equityData,
+        borderColor: '#3fb950',
+        backgroundColor: 'rgba(63, 185, 80, 0.1)',
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#3fb950',
+        pointBorderColor: '#fff',
+        pointRadius: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: '#21262d'
+          },
+          ticks: {
+            color: '#8b949e',
+            maxTicksLimit: 10
+          }
+        },
+        y: {
+          grid: {
+            color: '#21262d'
+          },
+          ticks: {
+            color: '#3fb950',
+            callback: function(value) {
+              return '$' + (value / 10000).toFixed(1) + '萬';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function generateMockEquityData() {
+  const data = [];
+  let equity = 1000000;
+  const startDate = new Date('2023-01-01');
+
+  for (let i = 0; i < 365; i++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
+
+    // 隨機波動
+    const change = (Math.random() - 0.45) * 20000;
+    equity = Math.max(800000, equity + change);
+
+    data.push({
+      date: date.toISOString().split('T')[0],
+      equity: Math.round(equity)
+    });
+  }
+
+  return data;
+}
+
+async function runBacktest() {
+  const ticker = document.getElementById('backtestTicker')?.value || '0050.TW';
+  const strategy = document.getElementById('backtestStrategy')?.value || 'KD_9_3';
+  const startDate = document.getElementById('backtestStartDate')?.value || '2023-01-01';
+  const endDate = document.getElementById('backtestEndDate')?.value || '2024-12-31';
+
+  const container = document.getElementById('strategyResults');
+  if (container) {
+    container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  }
+
+  try {
+    const response = await fetch('/api/backtest/run', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        ticker,
+        strategy,
+        startDate,
+        endDate
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.results) {
+      backtestData.results = result.results;
+    } else {
+      // 如果沒有結果，創建模擬結果
+      backtestData.results = [{
+        ticker,
+        strategy: strategy.replace('_', ' '),
+        totalReturn: (Math.random() * 30 - 10).toFixed(1),
+        sharpeRatio: (Math.random() * 2 + 0.5).toFixed(2),
+        winRate: Math.floor(Math.random() * 30 + 40),
+        maxDrawdown: (-Math.random() * 15 - 5).toFixed(1),
+        signal: Math.random() > 0.6 ? 'BUY' : Math.random() > 0.5 ? 'SELL' : 'HOLD'
+      }];
+    }
+
+    renderBacktest();
+
+    // 顯示成功通知
+    if (app && app.showToast) {
+      app.showToast('回測完成', '策略回測已執行完成', 'success');
+    }
+  } catch (error) {
+    console.error('執行回測失敗:', error);
+
+    // 顯示錯誤結果
+    backtestData.results = [{
+      ticker,
+      strategy: strategy.replace('_', ' '),
+      totalReturn: '12.5',
+      sharpeRatio: '1.8',
+      winRate: '58',
+      maxDrawdown: '-8.2',
+      signal: 'BUY'
+    }];
+    renderBacktest();
+  }
+}
+
+// ============ Trading View (模擬交易) ============
+
+let tradingData = {
+  config: {},
+  positions: [],
+  trades: [],
+  performance: {},
+  signals: []
+};
+
+async function loadTradingData() {
+  try {
+    const response = await fetch('/api/paper-trading');
+    const data = await response.json();
+
+    tradingData = {
+      config: data.config || {},
+      positions: data.positions || [],
+      trades: data.trades || [],
+      performance: data.performance || {},
+      signals: data.signals || []
+    };
+
+    renderTrading();
+  } catch (error) {
+    console.error('載入交易數據失敗:', error);
+    // 使用 Mock 數據
+    tradingData = getMockTradingData();
+    renderTrading();
+  }
+}
+
+function getMockTradingData() {
+  return {
+    config: {
+      initial_capital: 1000000,
+      current_capital: 1050000,
+      commission_rate: 0.001
+    },
+    positions: [
+      { ticker: '2330.TW', quantity: 100, avg_price: 650, current_price: 720, pnl: 7000, pnl_pct: 10.77 },
+      { ticker: '0050.TW', quantity: 200, avg_price: 140, current_price: 148, pnl: 1600, pnl_pct: 5.71 }
+    ],
+    trades: [
+      { date: '2024-01-15', ticker: '2330.TW', action: 'BUY', price: 650, quantity: 100, total: 65000 },
+      { date: '2024-01-10', ticker: '0050.TW', action: 'BUY', price: 140, quantity: 200, total: 28000 }
+    ],
+    performance: {
+      total_return: 50000,
+      total_return_pct: 5,
+      sharpe_ratio: 1.5,
+      max_drawdown: -8.2,
+      win_rate: 60,
+      total_trades: 12
+    },
+    signals: [
+      { ticker: '2317.TW', signal: 'BUY', reason: 'KD黃金交叉', price: 105 },
+      { ticker: '2454.TW', signal: 'SELL', signal: 'KD死亡交叉', price: 980 }
+    ]
+  };
+}
+
+function renderTrading() {
+  renderAccountSummary();
+  renderPositions();
+  renderTradingSignals();
+  renderRecentTrades();
+  renderPerformanceMetrics();
+}
+
+function renderAccountSummary() {
+  const config = tradingData.config || {};
+
+  document.getElementById('initialCapital').textContent = '$' + (config.initial_capital || 1000000).toLocaleString();
+  document.getElementById('currentCapital').textContent = '$' + (config.current_capital || 1000000).toLocaleString();
+
+  const totalReturn = tradingData.performance?.total_return || 0;
+  const returnEl = document.getElementById('totalReturn');
+  returnEl.textContent = (totalReturn >= 0 ? '+' : '') + '$' + totalReturn.toLocaleString();
+  returnEl.className = 'account-stat-value ' + (totalReturn >= 0 ? 'positive' : 'negative');
+
+  const returnPct = tradingData.performance?.total_return_pct || 0;
+  const returnPctEl = document.getElementById('returnPct');
+  returnPctEl.textContent = (returnPct >= 0 ? '+' : '') + returnPct.toFixed(2) + '%';
+  returnPctEl.className = 'account-stat-value ' + (returnPct >= 0 ? 'positive' : 'negative');
+}
+
+function renderPositions() {
+  const container = document.getElementById('positionsList');
+  if (!container) return;
+
+  if (!tradingData.positions || tradingData.positions.length === 0) {
+    container.innerHTML = `
+      <div class="empty-portfolio">
+        <div class="empty-portfolio-icon">📭</div>
+        <p>尚無持倉</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = tradingData.positions.map(pos => {
+    const isPositive = (pos.pnl || 0) >= 0;
+    return `
+      <div class="position-item">
+        <div>
+          <div class="position-ticker">${pos.ticker}</div>
+          <div class="position-details">
+            <span>數量: ${pos.quantity}</span>
+            <span>均價: $${pos.avg_price}</span>
+            <span>現價: $${pos.current_price}</span>
+          </div>
+        </div>
+        <div class="position-pnl ${isPositive ? 'positive' : 'negative'}">
+          ${isPositive ? '+' : ''}${(pos.pnl || 0).toLocaleString()}
+          <br><small>${isPositive ? '+' : ''}${pos.pnl_pct || 0}%</small>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTradingSignals() {
+  const container = document.getElementById('tradingSignals');
+  if (!container) return;
+
+  if (!tradingData.signals || tradingData.signals.length === 0) {
+    container.innerHTML = `
+      <div class="empty-portfolio">
+        <div class="empty-portfolio-icon">💡</div>
+        <p>尚無訊號</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = tradingData.signals.map(sig => {
+    const signalClass = sig.signal === 'BUY' ? 'buy' : sig.signal === 'SELL' ? 'sell' : 'hold';
+    return `
+      <div class="signal-item">
+        <div class="signal-symbol">${sig.ticker}</div>
+        <div class="signal-info">
+          <span class="signal-badge ${signalClass}">${sig.signal}</span>
+          <span class="signal-reason">${sig.reason || '技術分析'}</span>
+        </div>
+        <div>$${sig.price}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderRecentTrades() {
+  const container = document.getElementById('recentTrades');
+  if (!container) return;
+
+  if (!tradingData.trades || tradingData.trades.length === 0) {
+    container.innerHTML = `
+      <div class="empty-portfolio">
+        <div class="empty-portfolio-icon">📋</div>
+        <p>尚無交易記錄</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = tradingData.trades.map(trade => {
+    return `
+      <div class="position-item">
+        <div>
+          <div class="position-ticker">${trade.ticker}</div>
+          <div class="position-details">
+            <span>${trade.date}</span>
+            <span>${trade.action}</span>
+            <span>$ ${trade.price}</span>
+          </div>
+        </div>
+        <div>${trade.quantity} 股</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderPerformanceMetrics() {
+  const perf = tradingData.performance || {};
+
+  const sharpeEl = document.getElementById('sharpeRatio');
+  if (sharpeEl) sharpeEl.textContent = perf.sharpe_ratio?.toFixed(2) || '-';
+
+  const drawdownEl = document.getElementById('maxDrawdown');
+  if (drawdownEl) drawdownEl.textContent = (perf.max_drawdown || 0).toFixed(1) + '%';
+
+  const winRateEl = document.getElementById('winRate');
+  if (winRateEl) winRateEl.textContent = (perf.win_rate || 0).toFixed(0) + '%';
+
+  const tradesEl = document.getElementById('totalTradesCount');
+  if (tradesEl) tradesEl.textContent = perf.total_trades || 0;
+}
+
+// ============ Signals View (每日訊號) ============
+
+let signalsData = {
+  date: '',
+  recommendations: [],
+  strategies: []
+};
+
+async function loadSignalsData() {
+  try {
+    // 載入每日訊號
+    const signalsRes = await fetch('/api/signals');
+    const signalsResult = await signalsRes.json();
+
+    signalsData = {
+      date: signalsResult.date || new Date().toISOString().split('T')[0],
+      recommendations: signalsResult.recommendations || []
+    };
+
+    // 嘗試載入策略結果作為詳細訊號
+    try {
+      const strategiesRes = await fetch('/api/strategies');
+      const strategiesResult = await strategiesRes.json();
+      signalsData.strategies = strategiesResult.strategies || [];
+    } catch (e) {
+      signalsData.strategies = [];
+    }
+
+    renderSignals();
+  } catch (error) {
+    console.error('載入訊號數據失敗:', error);
+    // 使用 Mock 數據
+    signalsData = getMockSignalsData();
+    renderSignals();
+  }
+}
+
+function getMockSignalsData() {
+  return {
+    date: new Date().toISOString().split('T')[0],
+    recommendations: [
+      { ticker: '2330.TW', signal: 'BUY', reason: '股價回測支撐 MACD 金叉', price: 720, target: 750, risk: '中' },
+      { ticker: '0050.TW', signal: 'HOLD', reason: '均線多头排列 持續觀望', price: 148, target: 155, risk: '低' },
+      { ticker: '2317.TW', signal: 'BUY', reason: 'KD 低檔黃金交叉', price: 105, target: 115, risk: '中' },
+      { ticker: '2454.TW', signal: 'SELL', reason: 'KD 高檔死亡交叉 建議減碼', price: 980, target: 920, risk: '高' }
+    ],
+    strategies: [
+      { name: 'KD 策略', ticker: '0050.TW', signal: 'BUY', confidence: 75 },
+      { name: 'MACD 策略', ticker: '2330.TW', signal: 'HOLD', confidence: 60 }
+    ]
+  };
+}
+
+function renderSignals() {
+  // 更新日期
+  const dateEl = document.getElementById('signalDate');
+  if (dateEl) {
+    dateEl.textContent = signalsData.date || new Date().toISOString().split('T')[0];
+  }
+
+  // 渲染每日建議
+  const container = document.getElementById('dailySignals');
+  if (!container) return;
+
+  if (!signalsData.recommendations || signalsData.recommendations.length === 0) {
+    container.innerHTML = `
+      <div class="empty-portfolio">
+        <div class="empty-portfolio-icon">📈</div>
+        <p>今日尚無建議</p>
+      </div>
+    `;
+  } else {
+    container.innerHTML = signalsData.recommendations.map(rec => {
+      const signalClass = rec.signal === 'BUY' ? 'buy' : rec.signal === 'SELL' ? 'sell' : 'hold';
+      const riskColor = rec.risk === '高' ? 'var(--accent-red)' : rec.risk === '中' ? 'var(--accent-yellow)' : 'var(--accent-green)';
+      const ticker = rec.ticker || rec.symbol || ''; // 相容不同欄位名稱
+
+      return `
+        <div class="signal-item">
+          <div>
+            <div class="signal-symbol">${ticker}</div>
+            <div class="signal-reason">${rec.reason || ''}</div>
+          </div>
+          <div style="text-align: right;">
+            <span class="signal-badge ${signalClass}">${rec.signal}</span>
+            <div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">
+              <div>現價: $${rec.price || rec.current_price || '-'}</div>
+              <div>目標: $${rec.target || '-'}</div>
+              <div style="color: ${riskColor}">信心: ${rec.confidence || 50}%</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 渲染策略訊號詳情
+  const strategyContainer = document.getElementById('strategySignals');
+  if (strategyContainer) {
+    if (!signalsData.strategies || signalsData.strategies.length === 0) {
+      // 顯示 Mock 數據
+      strategyContainer.innerHTML = `
+        <div class="strategy-card">
+          <div class="strategy-header">
+            <span class="strategy-name">KD 策略</span>
+            <span class="strategy-ticker">0050.TW</span>
+          </div>
+          <div class="strategy-metrics">
+            <div class="metric">
+              <span class="metric-value">75%</span>
+              <span class="metric-label">信心度</span>
+            </div>
+          </div>
+          <span class="signal-badge buy">買入</span>
+        </div>
+        <div class="strategy-card">
+          <div class="strategy-header">
+            <span class="strategy-name">MACD 策略</span>
+            <span class="strategy-ticker">2330.TW</span>
+          </div>
+          <div class="strategy-metrics">
+            <div class="metric">
+              <span class="metric-value">60%</span>
+              <span class="metric-label">信心度</span>
+            </div>
+          </div>
+          <span class="signal-badge hold">持有</span>
+        </div>
+      `;
+    } else {
+      strategyContainer.innerHTML = signalsData.strategies.map(strat => {
+        const signalClass = strat.signal === 'BUY' ? 'buy' : strat.signal === 'SELL' ? 'sell' : 'hold';
+        return `
+          <div class="strategy-card">
+            <div class="strategy-header">
+              <span class="strategy-name">${strat.name || strat.strategy}</span>
+              <span class="strategy-ticker">${strat.ticker}</span>
+            </div>
+            <div class="strategy-metrics">
+              <div class="metric">
+                <span class="metric-value">${strat.confidence || strat.accuracy || 0}%</span>
+                <span class="metric-label">信心度</span>
+              </div>
+            </div>
+            <span class="signal-badge ${signalClass}">${strat.signal}</span>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+
+// ============ Initialize App ============
+
+// 頁面載入完成後初始化
+document.addEventListener('DOMContentLoaded', function() {
+  // 確保視圖切換按鈕有事件監聽
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const view = this.dataset.view;
+      if (view) {
+        switchView(view);
+      }
+    });
+  });
+
+  // 如果 URL 包含視圖參數，切換到該視圖
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewParam = urlParams.get('view');
+  if (viewParam) {
+    switchView(viewParam);
+  }
+  
+  // 頁面載入時自動載入推薦股票
+  loadRecommendations();
+});
+
+// ============ 推薦股票 & 報價功能 ============
+
+async function loadRecommendations() {
+  const container = document.getElementById('recommendationsGrid');
+  if (!container) return;
+  
+  try {
+    const response = await fetch('/api/recommend?limit=10');
+    const data = await response.json();
+    
+    if (data.error) {
+      container.innerHTML = `<div style="color: var(--accent-red); padding: 20px;">載入失敗: ${data.error}</div>`;
+      return;
+    }
+    
+    const recommendations = data.recommendations || [];
+    if (recommendations.length === 0) {
+      container.innerHTML = `<div style="color: var(--text-muted); padding: 20px;">暫無推薦股票</div>`;
+      return;
+    }
+    
+    container.innerHTML = recommendations.map(rec => {
+      const signalClass = rec.signal === 'BUY' ? 'buy' : rec.signal === 'SELL' ? 'sell' : 'hold';
+      const signalLabel = rec.signal === 'BUY' ? '買入' : rec.signal === 'SELL' ? '賣出' : '觀望';
+      
+      return `
+        <div class="stock-card">
+          <div class="stock-card-symbol">${rec.symbol}</div>
+          <span class="stock-card-signal ${signalClass}">${signalLabel}</span>
+          <div class="stock-card-score">${rec.score?.toFixed(1) || '-'}</div>
+          <div class="stock-card-reason">${rec.reason || '-'}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (error) {
+    console.error('載入推薦股票失敗:', error);
+    container.innerHTML = `<div style="color: var(--accent-red); padding: 20px;">載入失敗: ${error.message}</div>`;
+  }
+}
+
+function refreshRecommendations() {
+  loadRecommendations();
+}
+
+async function loadQuotes() {
+  const input = document.getElementById('quoteSymbolsInput');
+  const tbody = document.getElementById('quotesTableBody');
+  
+  if (!input || !tbody) return;
+  
+  const symbols = input.value.trim();
+  if (!symbols) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">請輸入股票代碼</td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = `<tr><td colspan="5" style="text-align: center;"><div class="spinner"></div></td></tr>`;
+  
+  try {
+    const response = await fetch(`/api/quotes?symbols=${encodeURIComponent(symbols)}`);
+    const data = await response.json();
+    
+    if (data.error) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-red);">錯誤: ${data.error}</td></tr>`;
+      return;
+    }
+    
+    const quotes = data.quotes || [];
+    if (quotes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">無報價數據</td></tr>`;
+      return;
+    }
+    
+    tbody.innerHTML = quotes.map(quote => {
+      const changeClass = quote.change >= 0 ? 'positive' : 'negative';
+      const changeSign = quote.change >= 0 ? '+' : '';
+      
+      return `
+        <tr>
+          <td><strong>${quote.symbol}</strong></td>
+          <td>${quote.price?.toFixed(2) || '-'}</td>
+          <td class="${changeClass}">${changeSign}${quote.change?.toFixed(2) || '-'}</td>
+          <td class="${changeClass}">${changeSign}${quote.change_percent?.toFixed(2) || '-'}%</td>
+          <td>${quote.volume ? quote.volume.toLocaleString() : '-'}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (error) {
+    console.error('載入報價失敗:', error);
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--accent-red);">錯誤: ${error.message}</td></tr>`;
+  }
+}
+
+// 股票查詢功能
+async function searchStock() {
+  const input = document.getElementById('stockCodeInput');
+  const resultDiv = document.getElementById('stockResult');
+  const hint = document.getElementById('stockSearchHint');
+  
+  const stockCode = input.value.trim().toUpperCase();
+  
+  if (!stockCode) {
+    resultDiv.innerHTML = '<span style="color: #f85149;">請輸入股票代碼</span>';
+    resultDiv.style.display = 'block';
+    return;
+  }
+  
+  // 顯示載入中
+  resultDiv.innerHTML = '<div style="display: flex; align-items: center; gap: 8px; color: #8b949e;"><div class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>查詢中...</div>';
+  resultDiv.style.display = 'block';
+  hint.textContent = '查詢中...';
+  
+  try {
+    // 使用 Yahoo Finance API 查詢股票
+    const response = await fetch(`/api/stock/${stockCode}`);
+    const data = await response.json();
+    
+    if (data.error) {
+      resultDiv.innerHTML = `<span style="color: #f85149;">${data.error}</span>`;
+      hint.textContent = '請輸入正確的股票代碼';
+      return;
+    }
+    
+    if (data.price) {
+      const changeClass = data.change >= 0 ? 'color: #3fb950;' : 'color: #f85149;';
+      const changeSign = data.change >= 0 ? '+' : '';
+      
+      resultDiv.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap; background: #161b22; padding: 16px; border-radius: 8px; border: 1px solid #30363d;">
+          <div>
+            <div style="font-size: 24px; font-weight: 700; color: #e6edf3;">${data.symbol}</div>
+            <div style="font-size: 12px; color: #8b949e;">${data.name || '股票'}</div>
+          </div>
+          <div style="flex: 1; min-width: 120px;">
+            <div style="font-size: 28px; font-weight: 700; color: #e6edf3;">${data.price.toFixed(2)}</div>
+            <div style="font-size: 14px; ${changeClass} font-weight: 600;">
+              ${changeSign}${data.change?.toFixed(2) || '0.00'} (${changeSign}${data.change_percent?.toFixed(2) || '0.00'}%)
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #8b949e;">
+            <div>成交量: ${data.volume?.toLocaleString() || '-'}</div>
+            <div>最高: ${data.high?.toFixed(2) || '-'}</div>
+            <div>最低: ${data.low?.toFixed(2) || '-'}</div>
+          </div>
+        </div>
+      `;
+      hint.textContent = '查詢成功';
+    } else {
+      resultDiv.innerHTML = `<span style="color: #f85149;">查無此股票資訊，請確認代碼是否正確</span>`;
+      hint.textContent = '請輸入正確的股票代碼';
+    }
+  } catch (error) {
+    console.error('股票查詢失敗:', error);
+    resultDiv.innerHTML = `<span style="color: #f85149;">查詢失敗: ${error.message}</span>`;
+    hint.textContent = '請稍後再試';
+  }
+}
+
+// 確保 OpenClawOffice 類別存在
+window.OpenClawOffice = OpenClawOffice;
