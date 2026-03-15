@@ -625,29 +625,34 @@ class OpenClawOffice {
       return;
     }
     
-    // 定義 avatar 顏色
-    const avatarColors = [
-      'linear-gradient(135deg, #667eea, #764ba2)',
-      'linear-gradient(135deg, #f093fb, #f5576c)',
-      'linear-gradient(135deg, #4facfe, #00f2fe)',
-      'linear-gradient(135deg, #43e97b, #38f9d7)',
-      'linear-gradient(135deg, #fa709a, #fee140)',
-      'linear-gradient(135deg, #a8edea, #fed6e3)',
-      'linear-gradient(135deg, #ff9a9e, #fecfef)',
-      'linear-gradient(135deg, #ffecd2, #fcb69f)'
-    ];
+    // 定義 agent 頭像
+    const agentAvatars = {
+      'ray': '🧑‍💻',
+      'tiffaney': '👩‍💼',
+      'jason': '📊',
+      'louie': '📈',
+      'luka': '🔧'
+    };
+    
+    const avatarColors = {
+      'ray': 'linear-gradient(135deg, #667eea, #764ba2)',
+      'tiffaney': 'linear-gradient(135deg, #f093fb, #f5576c)',
+      'jason': 'linear-gradient(135deg, #4facfe, #00f2fe)',
+      'louie': 'linear-gradient(135deg, #43e97b, #38f9d7)',
+      'luka': 'linear-gradient(135deg, #fa709a, #fee140)'
+    };
     
     grid.innerHTML = this.agents.map((agent, index) => {
-      const initials = this.getInitials(agent.name || agent.id);
+      const avatar = agentAvatars[agent.id.toLowerCase()] || this.getInitials(agent.name || agent.id);
       const statusClass = this.getStatusClass(agent.status);
       const task = agent.current_task || agent.task || agent.now_doing || '閒置中';
-      const avatarColor = avatarColors[index % avatarColors.length];
+      const avatarColor = avatarColors[agent.id.toLowerCase()] || avatarColors[index % 5];
       const hasMemory = agent.hasMemory;
       
       return `
         <div class="agent-card ${hasMemory ? 'has-memory' : ''}" ${hasMemory ? `onclick="viewAgentMemory('${agent.id}', '${agent.name}')"` : ''}>
           <div class="agent-header">
-            <div class="agent-avatar" style="background: ${avatarColor}">${initials}</div>
+            <div class="agent-avatar" style="background: ${avatarColor}; font-size: 28px;">${avatar}</div>
             <div class="agent-info">
               <h3>${agent.name || agent.id}</h3>
               <div class="role">${agent.role || 'Agent'}</div>
