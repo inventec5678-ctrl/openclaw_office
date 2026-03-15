@@ -1149,16 +1149,51 @@ async function viewMemory(filename) {
 // Agent Memory Modal Functions
 let currentAgentId = null;
 
+let currentBasicContent = null;
+let currentBasicFilename = null;
+
 async function viewAgentMemory(agentId, agentName) {
   try {
     currentAgentId = agentId;
+    currentBasicContent = null;
+    currentBasicFilename = null;
+    
     const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/memory`);
     const data = await res.json();
     
     if (res.ok) {
       document.getElementById('agentModalTitle').textContent = `🤖 ${agentName} - 記憶檔案`;
-      document.getElementById('agentModalBody').value = data.content;
-      document.getElementById('agentModalFilename').textContent = data.filename;
+      
+      // 顯示基礎記憶
+      if (data.basic) {
+        document.getElementById('agentModalBody').value = data.basic;
+        currentBasicContent = data.basic;
+        currentBasicFilename = data.basicFilename;
+        document.getElementById('basicFilename').innerHTML = '<span style="color: var(--accent-blue);">📋 ' + data.basicFilename + '</span>';
+      } else {
+        document.getElementById('agentModalBody').value = '';
+        document.getElementById('basicFilename').innerHTML = '<span style="color: var(--text-muted);">📭 無基礎記憶</span>';
+      }
+      
+      // 顯示工作筆記
+      const notesList = document.getElementById('notesList');
+      if (data.notes && Object.keys(data.notes).length > 0) {
+        notesList.innerHTML = '';
+        for (const [filename, content] of Object.entries(data.notes)) {
+          const noteDiv = document.createElement('div');
+          noteDiv.style.cssText = 'margin-bottom: 10px;';
+          noteDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-weight: 600; color: var(--accent-purple); font-size: 12px;">📝 ${filename}</span>
+              <button onclick="saveNoteMemory('${filename}')" style="padding: 4px 10px; background: var(--accent-purple); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">💾</button>
+            </div>
+            <textarea class="note-editor" data-filename="${filename}" style="width: 100%; height: 130px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: var(--text-primary); font-family: monospace; font-size: 12px; line-height: 1.5; resize: none;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>`;
+          notesList.appendChild(noteDiv);
+        }
+      } else {
+        notesList.innerHTML = '<div style="color: var(--text-muted); padding: 40px; text-align: center; font-size: 13px;">📭 無工作筆記</div>';
+      }
+      
       document.getElementById('agentMemoryModal').classList.add('active');
     } else {
       alert(data.error || '無法載入記憶檔案');
@@ -1169,10 +1204,41 @@ async function viewAgentMemory(agentId, agentName) {
   }
 }
 
+async function saveNoteMemory(filename) {
+  const textarea = document.querySelector(`textarea[data-filename="${filename}"]`);
+  if (!textarea) return;
+  
+  const content = textarea.value;
+  
+  try {
+    const res = await fetch(`/api/agents/${encodeURIComponent(currentAgentId)}/memory`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, type: 'note', filename })
+    });
+    
+    if (res.ok) {
+      alert('✅ 筆記已儲存');
+    } else {
+      const data = await res.json();
+      alert(data.error || '儲存失敗');
+    }
+  } catch (error) {
+    console.error('儲存筆記失敗:', error);
+    alert('儲存失敗');
+  }
+}
+
 async function saveAgentMemory() {
   if (!currentAgentId) return;
   
   const content = document.getElementById('agentModalBody').value;
+  
+  // 檢查是否有變更
+  if (content === currentBasicContent) {
+    alert('沒有變更需要儲存');
+    return;
+  }
   
   try {
     const res = await fetch(`/api/agents/${encodeURIComponent(currentAgentId)}/memory`, {

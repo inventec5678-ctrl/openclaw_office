@@ -1957,17 +1957,36 @@
 
   <!-- Agent Memory Modal -->
   <div class="modal-overlay" id="agentMemoryModal">
-    <div class="modal-content" style="max-width: 700px;">
+    <div class="modal-content" style="max-width: 800px; max-height: 85vh;">
       <div class="modal-header">
         <span class="modal-title" id="agentModalTitle">Agent 記憶檔案</span>
         <button class="modal-close" onclick="closeAgentMemoryModal()">×</button>
       </div>
-      <div class="modal-body" style="padding: 16px;">
-        <div class="agent-modal-filename" id="agentModalFilename" style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;"></div>
-        <textarea id="agentModalBody" class="agent-memory-editor" placeholder="載入中..."></textarea>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" onclick="closeAgentMemoryModal()">取消</button>
-          <button class="btn btn-primary" onclick="saveAgentMemory()">💾 儲存</button>
+      <div class="modal-body" style="padding: 16px; overflow-y: auto; max-height: 75vh;">
+        <!-- 基礎記憶與工作筆記並排 -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <!-- 基礎記憶 -->
+          <div style="background: var(--bg-tertiary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0;">
+              <span style="font-size: 13px; color: var(--accent-blue); font-weight: 600;">📋 基礎記憶</span>
+              <span id="basicFilename" style="font-size: 11px; color: var(--text-muted);"></span>
+            </div>
+            <div style="flex: 1; min-height: 0; margin-bottom: 8px;">
+              <textarea id="agentModalBody" class="agent-memory-editor" placeholder="載入中..." style="height: 100%; min-height: 140px;"></textarea>
+            </div>
+            <button onclick="saveAgentMemory()" style="width: 100%; padding: 8px; background: var(--accent-blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; flex-shrink: 0;">💾 儲存</button>
+          </div>
+          
+          <!-- 工作筆記 -->
+          <div style="background: var(--bg-tertiary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+            <div style="font-size: 13px; color: var(--accent-purple); margin-bottom: 8px; font-weight: 600; flex-shrink: 0;">📝 工作筆記</div>
+            <div id="notesList" style="flex: 1; min-height: 0; overflow-y: auto;"></div>
+          </div>
+        </div>
+        
+        <!-- 隱藏原本的 actions，改用上面的按鈕 -->
+        <div style="display: none;">
+        
         </div>
       </div>
     </div>
@@ -2020,17 +2039,36 @@
 
   <!-- Agent Memory Modal -->
   <div class="modal-overlay" id="agentMemoryModal">
-    <div class="modal-content" style="max-width: 700px;">
+    <div class="modal-content" style="max-width: 800px; max-height: 85vh;">
       <div class="modal-header">
         <span class="modal-title" id="agentModalTitle">Agent 記憶檔案</span>
         <button class="modal-close" onclick="closeAgentMemoryModal()">×</button>
       </div>
-      <div class="modal-body" style="padding: 16px;">
-        <div class="agent-modal-filename" id="agentModalFilename" style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;"></div>
-        <textarea id="agentModalBody" class="agent-memory-editor" placeholder="載入中..."></textarea>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" onclick="closeAgentMemoryModal()">取消</button>
-          <button class="btn btn-primary" onclick="saveAgentMemory()">💾 儲存</button>
+      <div class="modal-body" style="padding: 16px; overflow-y: auto; max-height: 75vh;">
+        <!-- 基礎記憶與工作筆記並排 -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <!-- 基礎記憶 -->
+          <div style="background: var(--bg-tertiary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0;">
+              <span style="font-size: 13px; color: var(--accent-blue); font-weight: 600;">📋 基礎記憶</span>
+              <span id="basicFilename" style="font-size: 11px; color: var(--text-muted);"></span>
+            </div>
+            <div style="flex: 1; min-height: 0; margin-bottom: 8px;">
+              <textarea id="agentModalBody" class="agent-memory-editor" placeholder="載入中..." style="height: 100%; min-height: 140px;"></textarea>
+            </div>
+            <button onclick="saveAgentMemory()" style="width: 100%; padding: 8px; background: var(--accent-blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; flex-shrink: 0;">💾 儲存</button>
+          </div>
+          
+          <!-- 工作筆記 -->
+          <div style="background: var(--bg-tertiary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+            <div style="font-size: 13px; color: var(--accent-purple); margin-bottom: 8px; font-weight: 600; flex-shrink: 0;">📝 工作筆記</div>
+            <div id="notesList" style="flex: 1; min-height: 0; overflow-y: auto;"></div>
+          </div>
+        </div>
+        
+        <!-- 隱藏原本的 actions，改用上面的按鈕 -->
+        <div style="display: none;">
+        
         </div>
       </div>
     </div>
