@@ -1767,14 +1767,17 @@
       </div>
     </header>
 
-    <!-- 隱私控制 -->
-    <div class="privacy-controls">
-      <label class="privacy-toggle">
-        <input type="checkbox" id="privacyToggle" onchange="togglePrivacyControls(this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
-      <span class="privacy-label">🔒 隱私控制</span>
-      <span class="privacy-hint">隱藏敏感內容以利展示</span>
+    <!-- Agent 工作狀態 - 移到最上面 -->
+    <div class="section" style="margin-top: 20px;">
+      <div class="section-header">
+        <h2 class="section-title">🤖 Agent 工作狀態</h2>
+        <span class="badge badge-active" id="agentCount">0 online</span>
+      </div>
+      <div class="agents-grid" id="agentsGrid">
+        <div class="loading">
+          <div class="spinner"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Hero View 總覽儀表板 -->
@@ -1805,19 +1808,6 @@
 
     <!-- 第一行：現有功能 -->
     <div class="main-content">
-      <!-- Agents Section -->
-      <div class="section">
-        <div class="section-header">
-          <h2 class="section-title">🤖 Agent 工作狀態</h2>
-          <span class="badge badge-active" id="agentCount">0 online</span>
-        </div>
-        <div class="agents-grid" id="agentsGrid">
-          <div class="loading">
-            <div class="spinner"></div>
-          </div>
-        </div>
-      </div>
-
       <!-- Sessions Section -->
       <div class="section">
         <div class="section-header">
